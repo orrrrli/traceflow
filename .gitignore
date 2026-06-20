@@ -1,10 +1,6 @@
-
-# AI Engineering Stack & Obsidian Brain
-.agents/
-.claude/
-.opencode/
-.windsurf/
-docs/brain/
-opencode.json
-GEMINI.md
-.state.json
+bin/
+obj/
+*.user
+*.suo
+.DS_Store
+*.log
