@@ -1,0 +1,710 @@
+{
+  "repo": "orrrrli/traceflow",
+  "owner": "orrrrli",
+  "owner_type": "user",
+  "project_number": 2,
+  "assignee": "orrrrli",
+  "project_title": "TraceFlow Backlog",
+  "epics": [
+    {
+      "id": "EPIC-FOUND",
+      "title": "Foundations & Infrastructure",
+      "fr": "Phase 0",
+      "phase": 0,
+      "size": "L",
+      "sprint": 1,
+      "summary": "Project structure, database schema, Docker Compose infrastructure, and test harness.",
+      "stories": [
+        {
+          "id": "BE-FOUND-1",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the team, I want a Clean Architecture project structure so backend development follows SOLID principles.",
+          "acceptance_criteria": [
+            "Given the solution file, When built, Then Domain, Application, Infrastructure, and API projects compile with no circular dependencies.",
+            "Given the Domain project, When inspected, Then it has zero external NuGet dependencies."
+          ],
+          "depends_on": [],
+          "tasks": [
+            "Create solution file and 4 layer projects (Domain, Application, Infrastructure, Api)",
+            "Configure project references (Api -> Infrastructure -> Application -> Domain)",
+            "Add MediatR, EF Core, FluentValidation, ErrorOr, Serilog NuGet packages"
+          ]
+        },
+        {
+          "id": "BE-FOUND-2",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the team, I want the database schema and EF Core migrations so all persistence is versioned.",
+          "acceptance_criteria": [
+            "Given a clean PostgreSQL database, When migrations run, Then Orders, OutboxMessages, and TraceEvents tables exist with correct columns and indexes.",
+            "Given the Orders table, When inspected, Then Id is UUID PK, Status is varchar(50), and timestamps are present."
+          ],
+          "depends_on": [
+            "BE-FOUND-1"
+          ],
+          "tasks": [
+            "Define Order entity with OrderStatus enum",
+            "Define OutboxMessage entity",
+            "Define TraceEvent entity",
+            "Create initial EF Core migration",
+            "Configure DbContext with PostgreSQL provider"
+          ]
+        },
+        {
+          "id": "OPS-FOUND-1",
+          "area": "devops",
+          "estimate": "M",
+          "title": "As the deployer, I want Docker Compose infrastructure so the entire system spins up with one command.",
+          "acceptance_criteria": [
+            "Given docker-compose.yml, When docker-compose up -d runs, Then PostgreSQL, RabbitMQ, and Redis containers are healthy.",
+            "Given RabbitMQ container, When accessed, Then management plugin is available on port 15672."
+          ],
+          "depends_on": [],
+          "tasks": [
+            "Create docker-compose.yml with PostgreSQL, RabbitMQ (management plugin), Redis",
+            "Configure healthchecks for PostgreSQL",
+            "Create .env.example template"
+          ]
+        },
+        {
+          "id": "BE-FOUND-3",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the team, I want a Testcontainers integration test harness so tests run against real PostgreSQL.",
+          "acceptance_criteria": [
+            "Given the test project, When dotnet test runs, Then a PostgreSQL container spins up, migrations apply, and tests execute.",
+            "Given a test class, When it uses WebApplicationFactory, Then the API uses the Testcontainers database."
+          ],
+          "depends_on": [
+            "BE-FOUND-2",
+            "OPS-FOUND-1"
+          ],
+          "tasks": [
+            "Create xUnit test project",
+            "Configure Testcontainers PostgreSQL module",
+            "Set up WebApplicationFactory with test DbContext",
+            "Verify migrations run in test container"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPIC-API-CORE",
+      "title": "Core API & Outbox Pattern",
+      "fr": "Phase 1",
+      "phase": 1,
+      "size": "XL",
+      "sprint": 2,
+      "summary": "Application layer, outbox pattern, Correlation ID middleware, API versioning, Swagger, validation, and core REST endpoints.",
+      "stories": [
+        {
+          "id": "BE-API-1",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want CQRS commands and queries so order creation and retrieval are decoupled.",
+          "acceptance_criteria": [
+            "Given CreateOrderCommand, When handled, Then a new Order is saved with Pending status.",
+            "Given GetOrderQuery, When handled, Then the order is returned by Id."
+          ],
+          "depends_on": [
+            "BE-FOUND-2"
+          ],
+          "tasks": [
+            "Implement CreateOrderCommand and handler",
+            "Implement GetOrderQuery and handler",
+            "Implement GetOrdersQuery with cursor pagination",
+            "Implement GetOrderTraceQuery"
+          ]
+        },
+        {
+          "id": "BE-API-2",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As the system, I want the outbox pattern so order creation and event publishing are atomic.",
+          "acceptance_criteria": [
+            "Given CreateOrderCommand, When handled, Then Order and OutboxMessage are saved in the same database transaction.",
+            "Given a failed save, When the transaction rolls back, Then neither Order nor OutboxMessage exists."
+          ],
+          "depends_on": [
+            "BE-API-1"
+          ],
+          "tasks": [
+            "Add OutboxMessage creation to CreateOrderCommand handler",
+            "Ensure shared transaction across Order and OutboxMessage",
+            "Write integration test proving atomicity"
+          ]
+        },
+        {
+          "id": "BE-API-3",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want Correlation ID middleware and structured logging so every request is traceable.",
+          "acceptance_criteria": [
+            "Given an incoming request without X-Correlation-Id header, When processed, Then a new GUID is generated and appears in every log line.",
+            "Given an incoming request with X-Correlation-Id header, When processed, Then the existing ID is propagated to logs."
+          ],
+          "depends_on": [
+            "BE-FOUND-1"
+          ],
+          "tasks": [
+            "Create CorrelationIdMiddleware",
+            "Configure Serilog with LogContext PushProperty",
+            "Add X-Correlation-Id response header",
+            "Verify CorrelationId appears in console logs"
+          ]
+        },
+        {
+          "id": "BE-API-4",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As a recruiter, I want versioned REST endpoints and Swagger UI so I can explore the API interactively.",
+          "acceptance_criteria": [
+            "Given the API, When accessed at /swagger, Then interactive documentation for all v1 endpoints is available.",
+            "Given POST /v1/orders, When called with valid body, Then it returns 201 Created with the order.",
+            "Given GET /v1/orders/{id}, When called, Then it returns 200 OK or 404 NotFound."
+          ],
+          "depends_on": [
+            "BE-API-1",
+            "BE-API-3"
+          ],
+          "tasks": [
+            "Configure API versioning with URL path prefix (/v1/)",
+            "Add Swagger/Swashbuckle with version support",
+            "Implement POST /v1/orders endpoint",
+            "Implement GET /v1/orders/{id} endpoint",
+            "Implement GET /v1/orders endpoint with cursor pagination",
+            "Implement GET /v1/orders/{id}/trace endpoint",
+            "Implement GET /health endpoint"
+          ]
+        },
+        {
+          "id": "BE-API-5",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want input validation and error handling so invalid requests fail gracefully.",
+          "acceptance_criteria": [
+            "Given POST /v1/orders with empty customerName, When validated, Then 400 Bad Request with field-level errors.",
+            "Given GET /v1/orders/{id} with non-existent id, When queried, Then 404 NotFound with ErrorOr format."
+          ],
+          "depends_on": [
+            "BE-API-4"
+          ],
+          "tasks": [
+            "Add FluentValidation rules for CreateOrderRequest",
+            "Configure ErrorOr error responses",
+            "Add global exception handler middleware",
+            "Write unit tests for validation rules"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPIC-MSG",
+      "title": "RabbitMQ Integration & Worker",
+      "fr": "Phase 2",
+      "phase": 2,
+      "size": "XL",
+      "sprint": 3,
+      "summary": "RabbitMQ topology, outbox dispatcher, Worker service, idempotency, and dead-letter queues.",
+      "stories": [
+        {
+          "id": "BE-MSG-1",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want explicit RabbitMQ topology so messaging is transparent and interview-explainable.",
+          "acceptance_criteria": [
+            "Given the system starts, When RabbitMQ is inspected, Then traceflow.order-events, traceflow.order-status-updates, and traceflow.dlx exchanges exist with correct bindings.",
+            "Given a message fails 3 times, When retried, Then it routes to traceflow.dead-letter queue."
+          ],
+          "depends_on": [
+            "OPS-FOUND-1"
+          ],
+          "tasks": [
+            "Create exchange/queue/binding setup utility",
+            "Configure direct exchanges for order-events and order-status-updates",
+            "Configure dead-letter exchange and dead-letter queue",
+            "Set queue properties: durable, manual ack, dead-letter routing"
+          ]
+        },
+        {
+          "id": "BE-MSG-2",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As the system, I want an outbox dispatcher so pending messages are reliably published to RabbitMQ.",
+          "acceptance_criteria": [
+            "Given pending OutboxMessages, When the dispatcher polls, Then up to 10 are fetched and published sequentially.",
+            "Given a publish failure, When the error occurs, Then the message Error field is updated and remaining messages continue processing."
+          ],
+          "depends_on": [
+            "BE-API-2",
+            "BE-MSG-1"
+          ],
+          "tasks": [
+            "Create OutboxDispatcher hosted service",
+            "Implement polling loop (2s interval)",
+            "Implement batch read (max 10) and sequential publish",
+            "Implement per-message failure handling with Error column update",
+            "Implement ProcessedAt update after successful publish"
+          ]
+        },
+        {
+          "id": "BE-MSG-3",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want a Worker service that consumes RabbitMQ messages so process separation is demonstrated.",
+          "acceptance_criteria": [
+            "Given the Worker starts, When it connects to RabbitMQ, Then it begins consuming from traceflow.worker.order-events queue.",
+            "Given a message is received, When processed, Then it is manually acked."
+          ],
+          "depends_on": [
+            "BE-MSG-1"
+          ],
+          "tasks": [
+            "Create .NET Worker Service project",
+            "Configure RabbitMQ consumer connection",
+            "Implement manual basicAck / basicNack",
+            "Add CorrelationId extraction from AMQP headers to logging scope"
+          ]
+        },
+        {
+          "id": "BE-MSG-4",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As the system, I want the Worker to simulate status progression and publish updates so the full async flow works.",
+          "acceptance_criteria": [
+            "Given Worker receives OrderCreated, When processing, Then it publishes OrderStatusChanged events at realistic intervals (3s/7s/4s/6s).",
+            "Given status changes, When published, Then the same CorrelationId is propagated in AMQP headers."
+          ],
+          "depends_on": [
+            "BE-MSG-3"
+          ],
+          "tasks": [
+            "Implement status progression logic with Task.Delay",
+            "Implement OrderStatusChanged event publishing",
+            "Write TraceEvents row (WorkerReceived) to PostgreSQL",
+            "Propagate CorrelationId in published message headers"
+          ]
+        },
+        {
+          "id": "BE-MSG-5",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the system, I want retry policy and dead-letter queues so failed messages don't block the pipeline.",
+          "acceptance_criteria": [
+            "Given a message processing fails, When retried, Then it is redelivered up to 3 times.",
+            "Given 3 retries exhaust, When the final nack occurs, Then the message routes to the dead-letter queue."
+          ],
+          "depends_on": [
+            "BE-MSG-3",
+            "BE-MSG-1"
+          ],
+          "tasks": [
+            "Configure retry policy (3 immediate retries)",
+            "Implement basicNack with requeue=false on final failure",
+            "Verify dead-letter queue receives failed messages",
+            "Add dead-letter monitoring/logging"
+          ]
+        },
+        {
+          "id": "BE-MSG-6",
+          "area": "backend",
+          "estimate": "S",
+          "title": "As the system, I want idempotency so duplicate messages are gracefully ignored.",
+          "acceptance_criteria": [
+            "Given a duplicate OrderCreated message, When consumed, Then the Worker logs a warning and acks without reprocessing.",
+            "Given the idempotency set, When inspected, Then it contains processed OrderIds."
+          ],
+          "depends_on": [
+            "BE-MSG-4"
+          ],
+          "tasks": [
+            "Implement in-memory HashSet<OrderId> idempotency check",
+            "Add duplicate detection logging",
+            "Document known limitation (in-memory only, lost on restart)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPIC-RT",
+      "title": "Real-time Updates, Caching & Health",
+      "fr": "Phase 3",
+      "phase": 3,
+      "size": "XL",
+      "sprint": 4,
+      "summary": "API background consumer, SignalR Hub, Redis caching with explicit invalidation, trace events, and health checks.",
+      "stories": [
+        {
+          "id": "BE-RT-1",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As the API, I want a background consumer for status updates so the Worker and API communicate through the queue.",
+          "acceptance_criteria": [
+            "Given the API starts, When it connects to RabbitMQ, Then it consumes from traceflow.api.order-status-updates with prefetchCount=1.",
+            "Given a status update message, When received, Then the Order row is updated in PostgreSQL."
+          ],
+          "depends_on": [
+            "BE-MSG-1",
+            "BE-API-2"
+          ],
+          "tasks": [
+            "Create API background consumer hosted service",
+            "Configure prefetchCount=1 for sequential processing",
+            "Implement Order status update in PostgreSQL",
+            "Write TraceEvents row (StatusChanged) to PostgreSQL"
+          ]
+        },
+        {
+          "id": "BE-RT-2",
+          "area": "backend",
+          "estimate": "L",
+          "title": "As the system, I want a SignalR Hub so the API can push real-time updates to connected clients.",
+          "acceptance_criteria": [
+            "Given a client connects, When it calls JoinOrderGroup(orderId), Then it receives OrderStatusUpdated events for that order.",
+            "Given a status update is processed, When pushed via IHubContext, Then only clients in that order's group receive it."
+          ],
+          "depends_on": [
+            "BE-RT-1"
+          ],
+          "tasks": [
+            "Create SignalR Hub at /hubs/orders",
+            "Implement JoinOrderGroup method",
+            "Implement OrderStatusUpdated event",
+            "Wire background consumer to push via IHubContext"
+          ]
+        },
+        {
+          "id": "BE-RT-3",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the API, I want Redis caching so order lookups are fast.",
+          "acceptance_criteria": [
+            "Given GET /v1/orders/{id}, When first called, Then the order is cached in Redis with 30s TTL.",
+            "Given a cached order, When requested again within 30s, Then the response comes from Redis (no DB query)."
+          ],
+          "depends_on": [
+            "BE-API-4"
+          ],
+          "tasks": [
+            "Configure StackExchangeRedis connection",
+            "Implement cache service with Get/Set/Remove",
+            "Add Redis caching to GetOrderQuery handler",
+            "Configure 30-second TTL"
+          ]
+        },
+        {
+          "id": "BE-RT-4",
+          "area": "backend",
+          "estimate": "S",
+          "title": "As the system, I want explicit cache invalidation so clients never see stale data.",
+          "acceptance_criteria": [
+            "Given a status update is received, When processed, Then the cached order entry is removed from Redis.",
+            "Given cache invalidation occurs, When a client requests the order, Then the fresh data is fetched from PostgreSQL and re-cached."
+          ],
+          "depends_on": [
+            "BE-RT-3",
+            "BE-RT-1"
+          ],
+          "tasks": [
+            "Implement cache invalidation in background consumer",
+            "Verify invalidation triggers on every status update"
+          ]
+        },
+        {
+          "id": "BE-RT-5",
+          "area": "backend",
+          "estimate": "M",
+          "title": "As the frontend, I want a trace endpoint so the full distributed journey is visible.",
+          "acceptance_criteria": [
+            "Given GET /v1/orders/{id}/trace, When called, Then all TraceEvents for that order are returned in chronological order.",
+            "Given the trace response, When inspected, Then it includes CorrelationId, Step, Service, Status, and Timestamp for each event."
+          ],
+          "depends_on": [
+            "BE-RT-1"
+          ],
+          "tasks": [
+            "Implement GetOrderTraceQuery handler",
+            "Implement GET /v1/orders/{id}/trace endpoint",
+            "Ensure TraceEvents are written by all services (API, Dispatcher, Worker)"
+          ]
+        },
+        {
+          "id": "BE-RT-6",
+          "area": "backend",
+          "estimate": "S",
+          "title": "As an operator, I want a health endpoint so I know all dependencies are healthy.",
+          "acceptance_criteria": [
+            "Given GET /health, When all dependencies are up, Then 200 OK with Healthy status for PostgreSQL, Redis, and RabbitMQ.",
+            "Given Redis is down, When GET /health is called, Then 503 Unhealthy with Redis marked as Unhealthy."
+          ],
+          "depends_on": [
+            "BE-API-4"
+          ],
+          "tasks": [
+            "Implement health checks for PostgreSQL, Redis, RabbitMQ",
+            "Configure ASP.NET Core HealthChecks middleware",
+            "Add /health endpoint with JSON response"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPIC-FE",
+      "title": "React Frontend",
+      "fr": "Phase 4",
+      "phase": 4,
+      "size": "XL",
+      "sprint": 5,
+      "summary": "Next.js frontend with FSD/Atomic Design, SignalR, status timeline, trace visualizer, dark mode, and idempotency demo.",
+      "stories": [
+        {
+          "id": "FE-FE-1",
+          "area": "frontend",
+          "estimate": "M",
+          "title": "As the team, I want a Next.js project with FSD and Atomic Design so the frontend is well-organized.",
+          "acceptance_criteria": [
+            "Given the project structure, When inspected, Then it follows FSD layers (app, pages, widgets, features, entities, shared).",
+            "Given shared/ui, When inspected, Then it contains atoms, molecules, organisms, and templates folders."
+          ],
+          "depends_on": [],
+          "tasks": [
+            "Create Next.js project with App Router",
+            "Set up FSD folder structure",
+            "Set up Atomic Design within shared/ui/",
+            "Configure TypeScript strict mode",
+            "Configure Tailwind CSS",
+            "Install and configure shadcn/ui CLI",
+            "Add base shadcn components (Button, Card, Input, Badge) to shared/ui/atoms/"
+          ]
+        },
+        {
+          "id": "FE-FE-2",
+          "area": "frontend",
+          "estimate": "S",
+          "title": "As a user, I want dark mode support so the UI feels modern.",
+          "acceptance_criteria": [
+            "Given the app loads, When the system preference is dark, Then the UI renders in dark mode.",
+            "Given a manual toggle, When clicked, Then the theme switches and persists."
+          ],
+          "depends_on": [
+            "FE-FE-1"
+          ],
+          "tasks": [
+            "Install next-themes",
+            "Configure Tailwind darkMode: 'class'",
+            "Add theme provider and toggle component",
+            "Apply dark: variants to existing components"
+          ]
+        },
+        {
+          "id": "FE-FE-3",
+          "area": "frontend",
+          "estimate": "M",
+          "title": "As a user, I want to create an order so the demo flow begins.",
+          "acceptance_criteria": [
+            "Given the home page, When I enter customerName and click create, Then an order is created and the CorrelationId is captured.",
+            "Given a successful creation, When the response arrives, Then the page navigates to ?order={id} and shows the order detail."
+          ],
+          "depends_on": [
+            "FE-FE-1"
+          ],
+          "tasks": [
+            "Create OrderForm organism component",
+            "Create API client for POST /v1/orders",
+            "Implement form validation",
+            "Implement navigation with orderId query param"
+          ]
+        },
+        {
+          "id": "FE-FE-4",
+          "area": "frontend",
+          "estimate": "M",
+          "title": "As a user, I want a status timeline so I can see the order's progress visually.",
+          "acceptance_criteria": [
+            "Given the order detail page, When loaded, Then the current status is shown with a visual timeline.",
+            "Given a live status update, When received via SignalR, Then the timeline animates to the new status."
+          ],
+          "depends_on": [
+            "FE-FE-3",
+            "FE-FE-5"
+          ],
+          "tasks": [
+            "Create StatusTimeline organism component",
+            "Implement status steps visualization (Pending \u2192 Paid \u2192 Preparing \u2192 Shipped \u2192 Delivered)",
+            "Add animated transitions between statuses",
+            "Style with Tailwind (including dark mode variants)"
+          ]
+        },
+        {
+          "id": "FE-FE-5",
+          "area": "frontend",
+          "estimate": "L",
+          "title": "As a user, I want SignalR real-time updates so the status changes without refreshing.",
+          "acceptance_criteria": [
+            "Given the order detail page, When loaded, Then it connects to SignalR and calls JoinOrderGroup(orderId).",
+            "Given the connection drops, When it happens, Then auto-reconnect with exponential backoff begins.",
+            "Given the order reaches Delivered, When it happens, Then SignalR disconnects automatically."
+          ],
+          "depends_on": [
+            "BE-RT-2"
+          ],
+          "tasks": [
+            "Install @microsoft/signalr",
+            "Create SignalR connection hook",
+            "Implement JoinOrderGroup on mount",
+            "Implement OrderStatusUpdated event handler",
+            "Configure auto-reconnect with exponential backoff",
+            "Implement auto-disconnect on Delivered"
+          ]
+        },
+        {
+          "id": "FE-FE-6",
+          "area": "frontend",
+          "estimate": "L",
+          "title": "As a recruiter, I want a trace visualizer so I can see the distributed system in action.",
+          "acceptance_criteria": [
+            "Given the trace panel, When loaded, Then it shows a chronological list of events with service names, timestamps, and CorrelationId.",
+            "Given live events, When they arrive, Then the trace updates with animated connecting lines between services."
+          ],
+          "depends_on": [
+            "FE-FE-5",
+            "BE-RT-5"
+          ],
+          "tasks": [
+            "Create TraceVisualizer organism component",
+            "Implement API client for GET /v1/orders/{id}/trace",
+            "Create event timeline with connecting lines",
+            "Add color-coding by service (API, Dispatcher, Worker)",
+            "Add animated dots for live updates"
+          ]
+        },
+        {
+          "id": "FE-FE-7",
+          "area": "frontend",
+          "estimate": "S",
+          "title": "As a user, I want to share an order link so the demo is shareable.",
+          "acceptance_criteria": [
+            "Given a URL with ?order={id}, When loaded, Then the order detail and trace are fetched and displayed.",
+            "Given a page refresh, When it happens, Then the same order state is restored without data loss."
+          ],
+          "depends_on": [
+            "FE-FE-3",
+            "FE-FE-6"
+          ],
+          "tasks": [
+            "Implement URL query param persistence",
+            "Handle page load with orderId from query params",
+            "Fetch order and trace on initial load"
+          ]
+        },
+        {
+          "id": "FE-FE-8",
+          "area": "frontend",
+          "estimate": "S",
+          "title": "As a demo user, I want to trigger a duplicate message so idempotency is visually demonstrated.",
+          "acceptance_criteria": [
+            "Given the trace panel, When the Trigger Duplicate button is clicked, Then a duplicate OrderCreated event is sent to RabbitMQ.",
+            "Given the duplicate is processed, When the Worker ignores it, Then the trace shows a warning icon with 'Duplicate message detected \u2014 ignored by Worker'."
+          ],
+          "depends_on": [
+            "FE-FE-6",
+            "BE-MSG-6"
+          ],
+          "tasks": [
+            "Create Trigger Duplicate button (dev/demo mode only)",
+            "Implement API endpoint or direct RabbitMQ publish for duplicate",
+            "Update trace visualizer to show duplicate warning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "EPIC-DEPLOY",
+      "title": "Dockerization & VPS Deployment",
+      "fr": "Phase 5",
+      "phase": 5,
+      "size": "L",
+      "sprint": 6,
+      "summary": "Dockerfiles for all services, Nginx reverse proxy, Cloudflare SSL, and production deployment.",
+      "stories": [
+        {
+          "id": "OPS-DEPLOY-1",
+          "area": "devops",
+          "estimate": "M",
+          "title": "As the deployer, I want Dockerfiles for all services so they run consistently.",
+          "acceptance_criteria": [
+            "Given docker-compose up, When it runs, Then API, Worker, and Web containers build and start successfully.",
+            "Given the API container, When it starts, Then EF migrations run automatically."
+          ],
+          "depends_on": [
+            "OPS-FOUND-1"
+          ],
+          "tasks": [
+            "Create API Dockerfile (multi-stage build)",
+            "Create Worker Dockerfile (multi-stage build)",
+            "Create Web Dockerfile (Next.js production build)",
+            "Update docker-compose.yml with all services"
+          ]
+        },
+        {
+          "id": "OPS-DEPLOY-2",
+          "area": "devops",
+          "estimate": "M",
+          "title": "As the deployer, I want Nginx as a reverse proxy so traffic routes correctly.",
+          "acceptance_criteria": [
+            "Given a request to api.getsynka.com, When it arrives, Then Nginx proxies it to the API container on port 5000.",
+            "Given a request to app.getsynka.com, When it arrives, Then Nginx proxies it to the Web container on port 3000."
+          ],
+          "depends_on": [
+            "OPS-DEPLOY-1"
+          ],
+          "tasks": [
+            "Create Nginx config with server blocks for app.getsynka.com and api.getsynka.com",
+            "Add Nginx service to docker-compose.yml",
+            "Configure proxy headers (X-Forwarded-For, Host)",
+            "Test routing locally"
+          ]
+        },
+        {
+          "id": "OPS-DEPLOY-3",
+          "area": "devops",
+          "estimate": "S",
+          "title": "As the deployer, I want Cloudflare + SSL so the site is secure.",
+          "acceptance_criteria": [
+            "Given app.getsynka.com, When accessed, Then it serves HTTPS via Cloudflare.",
+            "Given api.getsynka.com, When accessed, Then it serves HTTPS via Cloudflare."
+          ],
+          "depends_on": [
+            "OPS-DEPLOY-2"
+          ],
+          "tasks": [
+            "Configure Cloudflare DNS A records for app and api subdomains",
+            "Enable Cloudflare proxy (orange cloud)",
+            "Configure SSL/TLS mode (Flexible or Full)",
+            "Verify HTTPS is working"
+          ]
+        },
+        {
+          "id": "OPS-DEPLOY-4",
+          "area": "devops",
+          "estimate": "S",
+          "title": "As the deployer, I want deployment documentation so I can deploy manually.",
+          "acceptance_criteria": [
+            "Given the deployment docs, When followed, Then the entire system is running on the VPS within 30 minutes.",
+            "Given the .env file, When configured, Then no secrets are hardcoded in any file."
+          ],
+          "depends_on": [
+            "OPS-DEPLOY-3"
+          ],
+          "tasks": [
+            "Write VPS setup guide (Docker, Docker Compose, Nginx)",
+            "Document .env configuration and scp deployment",
+            "Document Cloudflare setup steps",
+            "Document troubleshooting (logs, health checks, RabbitMQ management)"
+          ]
+        }
+      ]
+    }
+  ]
+}
