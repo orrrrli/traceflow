@@ -4,3 +4,12 @@ obj/
 *.suo
 .DS_Store
 *.log
+
+# AI / editor tooling
+.agents/
+.claude/
+.opencode/
+.windsurf/
+.state.json
+GEMINI.md
+opencode.json
