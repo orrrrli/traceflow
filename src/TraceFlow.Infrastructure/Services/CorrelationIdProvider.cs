@@ -5,7 +5,7 @@ namespace TraceFlow.Infrastructure.Services;
 
 public sealed class CorrelationIdProvider : ICorrelationIdProvider
 {
-    private readonly AsyncLocal<Guid> _correlationId = new();
+    private static readonly AsyncLocal<Guid> _correlationId = new();
 
     public Guid Current
     {
